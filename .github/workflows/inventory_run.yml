@@ -1,0 +1,52 @@
+# .github/workflows/inventory_run.yml
+
+name: Inventory Scraping Run
+
+on:
+  schedule:
+    - cron: '0 14 * * 1-5'   # 09:00 Bogotá (UTC-5) lun-vie
+    - cron: '0 21 * * 1-5'   # 16:00 Bogotá (UTC-5) lun-vie
+  workflow_dispatch:           # trigger manual desde GitHub UI
+
+jobs:
+  scrape-and-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run inventory scraper
+        env:
+          PLP_URLS: ${{ secrets.PLP_URLS }}
+          SP_TENANT_ID: ${{ secrets.SP_TENANT_ID }}
+          SP_CLIENT_ID: ${{ secrets.SP_CLIENT_ID }}
+          SP_CLIENT_SECRET: ${{ secrets.SP_CLIENT_SECRET }}
+          SP_SITE_ID: ${{ secrets.SP_SITE_ID }}
+          SP_PARENT_ITEM_ID: ${{ secrets.SP_PARENT_ITEM_ID }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          ALERT_EMAILS: ${{ secrets.ALERT_EMAILS }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          TIMEZONE: America/Bogota
+          CRIT_MAX: '3'
+          LOW_MAX: '10'
+          THRESHOLD: '3'
+        run: python runner.py
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-logs-${{ github.run_id }}
+          path: '*.log'
